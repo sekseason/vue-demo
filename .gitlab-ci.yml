@@ -1,0 +1,63 @@
+variables:
+  OCTO_PACKAGEVERSION: 0.0.2
+  OCTO_PACKAGENAME: Dhuset.Uber.Admin
+  OCTO_PACKAGEID: $OCTO_PACKAGENAME.$OCTO_PACKAGEVERSION.zip
+  OCTO_APIKEY: API-3SXPXVDPPQPWU3IEWSG9EU7YZC
+
+stages:
+ - build
+ - package
+ - test
+ - deploy
+
+
+build_frontend:
+  image: node:8.11.3-alpine
+  stage: build
+  script: 
+    - yarn
+    - yarn build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1h
+
+package:
+  image: debian:9
+  stage: package
+  script:
+    - apt-get update
+    - apt-get upgrade -y
+    - apt-get install zip -y
+    - cd dist
+    - zip -r $OCTO_PACKAGEID *
+    - cd ..
+    - mv dist/$OCTO_PACKAGEID ./$OCTO_PACKAGEID
+  artifacts:
+    paths:
+      - $OCTO_PACKAGEID
+      
+test:
+  stage: test 
+  script: 
+    - echo 'to do'
+
+deploy:
+  image: debian:9
+  stage: deploy
+  script: 
+    - apt-get update
+    - apt-get upgrade -y
+    - apt-get install yarn -y
+    - apt-get install libunwind8 -y
+    - apt-get install icu-devtools -y
+    - apt-get install curl -y
+    - mkdir octo-cli
+    - cd octo-cli
+    - curl https://download.octopusdeploy.com/octopus-tools/4.39.2/OctopusTools.4.39.2.debian.8-x64.tar.gz | tar xz
+    - cd ..
+    - export PATH="$PATH:./octo-cli"
+    - 'curl -X POST https://octopus.vcon.co/api/packages/raw?replace=true -H "X-Octopus-ApiKey: $OCTO_APIKEY" -F "data=@$OCTO_PACKAGEID"'
+    - Octo delete-releases --project "DHuset Uber Admin" --minversion="$OCTO_PACKAGEVERSION" --maxversion="$OCTO_PACKAGEVERSION" --server https://octopus.vcon.co/ --apiKey $OCTO_APIKEY
+    - Octo create-release --project "DHuset Uber Admin" --version $OCTO_PACKAGEVERSION --package $OCTO_PACKAGENAME:$OCTO_PACKAGEVERSION --server https://octopus.vcon.co/ --apiKey $OCTO_APIKEY    
+    - Octo deploy-release --project "DHuset Uber Admin" --version latest --deployto Development --server https://octopus.vcon.co/ --apiKey $OCTO_APIKEY
